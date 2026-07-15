@@ -13,7 +13,7 @@ import (
 // reject unsupported pairs here with a useful message instead of paying a
 // network round-trip for a guaranteed failure.
 
-// ImplementedConversions lists the 44 implemented "{input}-to-{output}"
+// ImplementedConversions lists the 43 implemented "{input}-to-{output}"
 // conversion endpoints, copied verbatim from the Node SDK's formats.ts.
 var ImplementedConversions = map[string]struct{}{
 	// Structured text (13)
@@ -30,7 +30,7 @@ var ImplementedConversions = map[string]struct{}{
 	"markdown-to-html": {},
 	"markdown-to-pdf":  {},
 	"html-to-pdf":      {},
-	// Documents (10)
+	// Documents (9) — EPUB->PDF now flows through anything-to-pdf, not a dedicated pair.
 	"doc-to-pdf":     {},
 	"excel-to-pdf":   {},
 	"ppt-to-pdf":     {},
@@ -40,7 +40,6 @@ var ImplementedConversions = map[string]struct{}{
 	"ots-to-pdf":     {},
 	"pages-to-pdf":   {},
 	"numbers-to-pdf": {},
-	"epub-to-pdf":    {},
 	// Images (21)
 	"jpeg-to-png":  {},
 	"png-to-jpeg":  {},
@@ -81,21 +80,21 @@ var imageFormats = map[string]string{
 // documentFormats maps a filename extension to its API input format for
 // convertDocument inputs.
 var documentFormats = map[string]string{
-	".doc":      "doc",
-	".docx":     "doc",
-	".xls":      "excel",
-	".xlsx":     "excel",
-	".ppt":      "ppt",
-	".pptx":     "ppt",
-	".html":     "html",
-	".htm":      "html",
-	".odt":      "odt",
-	".ods":      "ods",
-	".odp":      "odp",
-	".ots":      "ots",
-	".pages":    "pages",
-	".numbers":  "numbers",
-	".epub":     "epub",
+	".doc":     "doc",
+	".docx":    "doc",
+	".xls":     "excel",
+	".xlsx":    "excel",
+	".ppt":     "ppt",
+	".pptx":    "ppt",
+	".html":    "html",
+	".htm":     "html",
+	".odt":     "odt",
+	".ods":     "ods",
+	".odp":     "odp",
+	".ots":     "ots",
+	".pages":   "pages",
+	".numbers": "numbers",
+	// .epub has no dedicated document pair — use ConvertToPDF / ConvertToMarkdown.
 	".md":       "markdown",
 	".markdown": "markdown",
 	".csv":      "csv",

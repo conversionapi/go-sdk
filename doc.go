@@ -1,11 +1,11 @@
-// Package enconvert is the Go SDK for the Enconvert file conversion API
-// (https://enconvert.com).
-//
-// Convert URLs to PDFs, capture screenshots, extract Markdown, crawl whole
-// websites, transform images, and convert documents — all with a single API
-// call. The V2 namespace (Client.V2) additionally renders pages into
-// agent-ready artifacts, runs web search, extracts structured data, ingests
-// sites into RAG-ready JSONL, and watches pages for changes.
+// Package enconvert is the Go SDK for Enconvert (https://enconvert.com):
+// read any page or file into agent-ready Markdown/JSON/screenshots, every
+// read scored 0.0-1.0 for render quality. The V2 namespace (Client.V2)
+// renders pages into agent-ready artifacts, runs web search, extracts
+// structured data, ingests sites or files into RAG-ready JSONL, and watches
+// pages for changes. The same client also converts URLs to PDFs, captures
+// screenshots, extracts Markdown, crawls whole websites, transforms images,
+// and converts 43 document/data format pairs.
 //
 // # Quick start
 //
@@ -30,4 +30,4 @@
 package enconvert
 
 // Version is the SDK's release version.
-const Version = "0.0.1"
+const Version = "0.0.2"

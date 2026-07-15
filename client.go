@@ -221,10 +221,11 @@ func (c *Client) ConvertImage(ctx context.Context, file FileSource, opts Convert
 }
 
 // ConvertDocument converts a document (doc, excel, ppt, odt, ods, odp, ots,
-// pages, numbers, epub, html, markdown, csv, json, xml, yaml, toml). Output
+// pages, numbers, html, markdown, csv, json, xml, yaml, toml). Output
 // defaults to pdf. Only pairs implemented by the API are accepted;
 // unsupported pairs return an error before any request is made. file may be
-// a FilePath, FileBytes, or FileInput.
+// a FilePath, FileBytes, or FileInput. (EPUB has no dedicated document pair
+// — use ConvertToPDF / ConvertToMarkdown.)
 func (c *Client) ConvertDocument(ctx context.Context, file FileSource, opts ConvertDocumentOptions) (ConversionResult, error) {
 	part, err := file.resolve()
 	if err != nil {
@@ -245,6 +246,54 @@ func (c *Client) ConvertDocument(ctx context.Context, file FileSource, opts Conv
 	}
 
 	data, err := c.postFile(ctx, "/v1/convert/"+endpoint, part, opts.OutputFilename, opts.PDFOptions)
+	if err != nil {
+		return ConversionResult{}, err
+	}
+	result := toConversionResult(data)
+	if opts.SaveTo != "" {
+		if err := c.download(ctx, result.PresignedURL, opts.SaveTo); err != nil {
+			return ConversionResult{}, err
+		}
+	}
+	return result, nil
+}
+
+// ConvertToMarkdown converts an uploaded file of (almost) any document
+// format to clean Markdown — PDF, DOCX, PPTX, XLSX, CSV, HTML, EPUB, TXT/MD,
+// and legacy/ODF office. The format is auto-detected server-side; a
+// RAG-ingestion building block. Images are not supported. file may be a
+// FilePath, FileBytes, or FileInput.
+func (c *Client) ConvertToMarkdown(ctx context.Context, file FileSource, opts ConvertToMarkdownOptions) (ConversionResult, error) {
+	part, err := file.resolve()
+	if err != nil {
+		return ConversionResult{}, err
+	}
+
+	data, err := c.postFile(ctx, "/v1/convert/anything-to-markdown", part, opts.OutputFilename, nil)
+	if err != nil {
+		return ConversionResult{}, err
+	}
+	result := toConversionResult(data)
+	if opts.SaveTo != "" {
+		if err := c.download(ctx, result.PresignedURL, opts.SaveTo); err != nil {
+			return ConversionResult{}, err
+		}
+	}
+	return result, nil
+}
+
+// ConvertToPDF converts an uploaded file of (almost) any format to PDF —
+// office/ODF/Pages/Numbers/RTF/CSV, HTML, Markdown, text, raster images,
+// SVG, EPUB, or an existing PDF (passthrough/normalise). The format is
+// auto-detected server-side. Only PDFOptions.Grayscale is honored on this
+// endpoint. file may be a FilePath, FileBytes, or FileInput.
+func (c *Client) ConvertToPDF(ctx context.Context, file FileSource, opts ConvertToPDFOptions) (ConversionResult, error) {
+	part, err := file.resolve()
+	if err != nil {
+		return ConversionResult{}, err
+	}
+
+	data, err := c.postFile(ctx, "/v1/convert/anything-to-pdf", part, opts.OutputFilename, opts.PDFOptions)
 	if err != nil {
 		return ConversionResult{}, err
 	}

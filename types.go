@@ -142,6 +142,20 @@ type ConvertDocumentOptions struct {
 	PDFOptions     *PDFOptions
 }
 
+// ConvertToMarkdownOptions configures ConvertToMarkdown (anything-to-markdown).
+type ConvertToMarkdownOptions struct {
+	SaveTo         string
+	OutputFilename string
+}
+
+// ConvertToPDFOptions configures ConvertToPDF (anything-to-pdf).
+type ConvertToPDFOptions struct {
+	SaveTo         string
+	OutputFilename string
+	// PDFOptions: only Grayscale is honored by the anything-to-pdf endpoint.
+	PDFOptions *PDFOptions
+}
+
 // CrawlMode is the URL discovery strategy for website conversions.
 type CrawlMode string
 

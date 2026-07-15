@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 )
@@ -307,12 +309,12 @@ type DiscoverResult struct {
 type LookupCategory string
 
 const (
-	LookupCategoryWeb      LookupCategory = "web"
-	LookupCategoryNews     LookupCategory = "news"
-	LookupCategoryImages   LookupCategory = "images"
-	LookupCategoryScholar  LookupCategory = "scholar"
-	LookupCategoryPatents  LookupCategory = "patents"
-	LookupCategoryMaps     LookupCategory = "maps"
+	LookupCategoryWeb     LookupCategory = "web"
+	LookupCategoryNews    LookupCategory = "news"
+	LookupCategoryImages  LookupCategory = "images"
+	LookupCategoryScholar LookupCategory = "scholar"
+	LookupCategoryPatents LookupCategory = "patents"
+	LookupCategoryMaps    LookupCategory = "maps"
 )
 
 // LookupTimeFilter restricts results by recency.
@@ -528,6 +530,7 @@ const (
 	IngestModeURLs    IngestMode = "urls"
 	IngestModeSitemap IngestMode = "sitemap"
 	IngestModeCrawl   IngestMode = "crawl"
+	IngestModeFiles   IngestMode = "files"
 )
 
 // IngestStatus is the lifecycle state of an ingest job.
@@ -573,6 +576,16 @@ type IngestOptions struct {
 	WaitFor         string
 	WaitTimeoutMs   *int
 	Chunk           *IngestChunkOptions
+	// WebhookURL is the completion webhook, HMAC-signed (see
+	// GetWebhookSecret).
+	WebhookURL string
+}
+
+// IngestFilesOptions configures IngestFiles. Uploaded documents are
+// converted to Markdown and chunked through the same pipeline as Ingest.
+type IngestFilesOptions struct {
+	// Chunk configures the heading-aware chunker parameters.
+	Chunk *IngestChunkOptions
 	// WebhookURL is the completion webhook, HMAC-signed (see
 	// GetWebhookSecret).
 	WebhookURL string
@@ -706,14 +719,14 @@ type WatcherUpdate struct {
 // Watcher is the outcome of CreateWatcher, GetWatcher, UpdateWatcher,
 // DeleteWatcher.
 type Watcher struct {
-	WatcherID        string
-	URL              string
-	Status           WatcherStatus
-	FrequencyMinutes int
-	DiffMode         WatchDiffMode
-	TrackFields      map[string]any
-	WebhookURL       string
-	NotifyEmail      bool
+	WatcherID         string
+	URL               string
+	Status            WatcherStatus
+	FrequencyMinutes  int
+	DiffMode          WatchDiffMode
+	TrackFields       map[string]any
+	WebhookURL        string
+	NotifyEmail       bool
 	ConsecutiveErrors int
 	ChecksCount       int
 	LastCheckAt       string
@@ -1051,6 +1064,67 @@ func (v *V2) Ingest(ctx context.Context, opts IngestOptions) (IngestJob, error) 
 	}
 
 	data, err := v.postJSON(ctx, "/v2/ingest", body)
+	if err != nil {
+		return IngestJob{}, err
+	}
+	return toIngestJob(data), nil
+}
+
+// IngestFiles ingests one or more uploaded files into RAG-ready JSONL
+// chunks — the file counterpart of Ingest, sharing the same job lifecycle
+// (mode "files"). PDF, DOCX, PPTX, XLSX, CSV, HTML, EPUB, TXT/MD and
+// legacy/ODF office are accepted. Always asynchronous; poll GetIngestJob or
+// configure a webhook. files may be FilePath, FileBytes, or FileInput; at
+// least one is required.
+func (v *V2) IngestFiles(ctx context.Context, files []FileSource, opts IngestFilesOptions) (IngestJob, error) {
+	if len(files) == 0 {
+		return IngestJob{}, errors.New("ingestFiles: provide at least one file")
+	}
+
+	buf := &bytes.Buffer{}
+	writer := multipart.NewWriter(buf)
+	for _, file := range files {
+		part, err := file.resolve()
+		if err != nil {
+			return IngestJob{}, err
+		}
+		header := textproto.MIMEHeader{}
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="files"; filename="%s"`, escapeQuotes(part.filename)))
+		contentType := part.contentType
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		header.Set("Content-Type", contentType)
+		fw, err := writer.CreatePart(header)
+		if err != nil {
+			return IngestJob{}, err
+		}
+		if _, err := fw.Write(part.data); err != nil {
+			return IngestJob{}, err
+		}
+	}
+	if opts.Chunk != nil {
+		if opts.Chunk.MaxWords != nil {
+			if err := writer.WriteField("max_words", strconv.Itoa(*opts.Chunk.MaxWords)); err != nil {
+				return IngestJob{}, err
+			}
+		}
+		if opts.Chunk.SentenceOverlap != nil {
+			if err := writer.WriteField("sentence_overlap", strconv.Itoa(*opts.Chunk.SentenceOverlap)); err != nil {
+				return IngestJob{}, err
+			}
+		}
+	}
+	if opts.WebhookURL != "" {
+		if err := writer.WriteField("webhook_url", opts.WebhookURL); err != nil {
+			return IngestJob{}, err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return IngestJob{}, err
+	}
+
+	data, err := v.client.doJSON(ctx, http.MethodPost, "/v2/ingest/files", writer.FormDataContentType(), buf)
 	if err != nil {
 		return IngestJob{}, err
 	}
