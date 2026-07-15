@@ -1,0 +1,23 @@
+# Build artifacts
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Coverage
+*.out
+coverage.txt
+
+# Go workspace / module cache
+go.work
+go.work.sum
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
